@@ -1,0 +1,349 @@
+<!-- templates/dashboard.html -->
+{% extends "base.html" %}
+
+{% block title %}F1 AI Strategy Dashboard{% endblock %}
+
+{% block content %}
+<header
+  class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+>
+  <div>
+    <h1 class="text-3xl md:text-4xl font-bold tracking-tight">
+      F1 Lap Time Prediction &amp; Pit Strategy
+    </h1>
+    <p class="mt-1 text-sm text-slate-300 max-w-xl">
+      ใช้ข้อมูลจริงจาก Bahrain GP {{ meta.year }} (Driver:
+      {{ meta.driver }}) ผ่าน FastF1 และโมเดล Random Forest เพือ่ทำนาย Lap Time
+      และจำลองกลยุทธ์การเข้าพิท
+    </p>
+  </div>
+  <div
+    class="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 text-xs text-slate-300 shadow-lg max-w-xs"
+  >
+    <p class="font-semibold text-slate-100 mb-1">Concept</p>
+    <ul class="space-y-1 list-disc list-inside">
+      <li>เทรน AI ทำนาย Lap Time จากตัวแปรเหมือนแข่งจริง</li>
+      <li>จำลองกลยุทธ์ยาง &amp; pit stop</li>
+      <li>เปรียบเทียบกับผลแข่งขันจริง</li>
+    </ul>
+  </div>
+</header>
+
+<!-- Metrics cards -->
+<section class="grid gap-4 md:grid-cols-4">
+  <div
+    class="bg-slate-900/80 rounded-2xl p-4 shadow-lg border border-slate-800"
+  >
+    <p class="text-xs text-slate-400">MAE</p>
+    <p class="text-3xl font-semibold mt-1">{{ mae }}</p>
+    <p class="text-xs text-slate-400 mt-1">
+      ความคลาดเคลื่อนเฉลี่ยต่อ Lap (วินาที)
+    </p>
+  </div>
+
+  <div
+    class="bg-slate-900/80 rounded-2xl p-4 shadow-lg border border-slate-800"
+  >
+    <p class="text-xs text-slate-400">RMSE</p>
+    <p class="text-3xl font-semibold mt-1">{{ rmse }}</p>
+    <p class="text-xs text-slate-400 mt-1">
+      เน้น error ที่มากเป็นพิเศษ (แพ้ชนะ level 0.1 วินาที)
+    </p>
+  </div>
+
+  <div
+    class="bg-slate-900/80 rounded-2xl p-4 shadow-lg border border-slate-800"
+  >
+    <p class="text-xs text-slate-400">จำนวน Lap</p>
+    <p class="text-3xl font-semibold mt-1">{{ laps_count }}</p>
+    <p class="text-xs text-slate-400 mt-1">ข้อมูลจากนักขับคนเดียว</p>
+  </div>
+
+  <div
+    class="bg-slate-900/80 rounded-2xl p-4 shadow-lg border border-emerald-500/50"
+  >
+    <p class="text-xs text-slate-400">เวลาจริงของการแข่งขัน</p>
+    <p class="text-lg font-semibold mt-1">{{ real_race_time_mmss }}</p>
+    <p class="text-xs text-slate-400 mt-1">
+      ({{ real_race_time }}) รวมเวลาทุก Lap จาก FastF1
+    </p>
+  </div>
+</section>
+
+<!-- Charts + Strategy -->
+<section class="grid gap-6 lg:grid-cols-5">
+  <!-- Lap Time Chart -->
+  <div
+    class="lg:col-span-3 bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800"
+  >
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <h2 class="text-lg font-semibold">
+          เปรียบเทียบ Lap Time: จริง vs ทำนาย
+        </h2>
+        <p class="text-xs text-slate-400">
+          จากข้อมูลจริงของการแข่งขัน · ยิ่งเส้นทำนายใกล้เส้นจริง → โมเดลยิ่งดี
+        </p>
+      </div>
+    </div>
+    <canvas id="lapTimeChart" class="w-full h-64"></canvas>
+  </div>
+
+  <!-- Best Strategy + Race Comparison -->
+  <div class="lg:col-span-2 space-y-4">
+    <div
+      class="bg-slate-900 rounded-2xl p-4 shadow-lg border border-emerald-500/60"
+    >
+      <p
+        class="text-xs uppercase tracking-wide text-emerald-300 font-semibold"
+      >
+        Best Strategy (Simulation)
+      </p>
+
+      <p class="mt-2 text-sm text-slate-200">
+        กลยุทธ์ที่ดีที่สุดจากการจำลอง:
+        <span class="font-semibold text-emerald-300">
+          {{ best_strategy.first_compound }} → {{ best_strategy.second_compound }}
+        </span>
+        (เข้าพิทที่ Lap
+        <span class="font-semibold">{{ best_strategy.pit_lap }}</span>)
+      </p>
+
+      <div class="mt-3 text-sm space-y-1">
+        <p>
+          <span class="text-slate-400">เวลาจริง (จาก FastF1):</span>
+          <span class="font-semibold">
+            {{ real_race_time_mmss }} ({{ real_race_time }})
+          </span>
+        </p>
+        <p>
+          <span class="text-slate-400">เวลาจำลองของกลยุทธ์นี้:</span>
+          <span class="font-semibold">
+            {{ best_race_time }} ({{ "%.2f"|format(best_strategy.total_time) }}
+            s)
+          </span>
+        </p>
+        <p>
+          <span class="text-slate-400">ส่วนต่างจำลอง vs จริง:</span>
+          <span class="font-semibold text-amber-300">
+            {{ delta_sec_str }} (≈ {{ delta_race_time }})
+          </span>
+          <span class="text-slate-400 text-xs">
+            (~{{ percent_diff|round(2) }}% ต่างจากเวลาจริง)
+          </span>
+        </p>
+      </div>
+
+      <p class="mt-3 text-[11px] text-slate-400 leading-relaxed">
+        เวลา “จริง” มาจากการบวก LapTime ของทุก lap ที่ได้จาก FastF1 (ระบบ
+        Timing ของ FIA) ส่วนเวลา “จำลอง” มาจากโมเดล Machine Learning
+        ที่ทำนาย LapTime ภายใต้สมมติฐานเรื่อง compound, tyre life และการเข้าพิท
+        ทำให้เราสามารถทดลองกลยุทธ์ได้โดยไม่ต้องลงสนามจริง
+      </p>
+    </div>
+
+    <!-- Strategy table -->
+    <div
+      class="bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800 max-h-[260px] overflow-auto"
+    >
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold">รายการกลยุทธ์ที่จำลอง</h3>
+        <p class="text-[11px] text-slate-400">
+          เทียบเวลารวม &amp; ส่วนต่างจากกลยุทธ์ที่ดีที่สุด
+        </p>
+      </div>
+      <table class="w-full text-xs border-collapse">
+        <thead class="text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="py-1 text-left">#</th>
+            <th class="py-1 text-left">Strategy</th>
+            <th class="py-1 text-center">Pit Lap</th>
+            <th class="py-1 text-right">Total Time (s)</th>
+            <th class="py-1 text-right">Δ vs Best</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in strategies %}
+          <tr
+            class="border-b border-slate-800 {% if s.total_time == best_strategy.total_time %}bg-emerald-500/10{% endif %}"
+          >
+            <td class="py-1 pr-2 align-top">{{ loop.index }}</td>
+            <td class="py-1 pr-2">
+              {{ s.first_compound }} → {{ s.second_compound }}
+            </td>
+            <td class="py-1 text-center">{{ s.pit_lap }}</td>
+            <td class="py-1 text-right">
+              {{ "%.2f"|format(s.total_time) }}
+              {% if s.total_time == best_strategy.total_time %}
+              <span class="ml-1 text-emerald-300 font-semibold">BEST</span>
+              {% endif %}
+            </td>
+            <td class="py-1 text-right">
+              {% if s.total_time == best_strategy.total_time %}
+              <span class="text-emerald-300 font-semibold">0.00 s</span>
+              {% else %}
+              <span class="text-slate-200">
+                +{{ "%.2f"|format(s.delta_vs_best) }} s
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Strategy bar chart -->
+<section
+  class="bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800"
+>
+  <div class="flex items-center justify-between mb-2">
+    <div>
+      <h2 class="text-lg font-semibold">
+        เปรียบเทียบเวลารวมของแต่ละกลยุทธ์
+      </h2>
+      <p class="text-xs text-slate-400">
+        ยิ่งแท่งเตี้ย → เวลารวมยิ่งน้อย → กลยุทธ์ดีกว่า
+      </p>
+    </div>
+  </div>
+  <canvas id="strategyChart" class="w-full h-60"></canvas>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const lapLabels   = JSON.parse('{{ lap_labels   | tojson | safe }}');
+  const actualLaps  = JSON.parse('{{ actual_laps  | tojson | safe }}');
+  const predLaps    = JSON.parse('{{ pred_laps    | tojson | safe }}');
+  const strategies  = JSON.parse('{{ strategies   | tojson | safe }}');
+  const bestStrategy= JSON.parse('{{ best_strategy| tojson | safe }}');
+  const minY        = JSON.parse('{{ min_y        | tojson | safe }}');
+  const maxY        = JSON.parse('{{ max_y        | tojson | safe }}');
+
+  const colorActual = "rgba(59, 130, 246, 1)";
+  const colorPred = "rgba(251, 146, 60, 1)";
+
+  // Line chart: Lap Time จริง vs ทำนาย
+  const ctxLap = document.getElementById("lapTimeChart").getContext("2d");
+  new Chart(ctxLap, {
+    type: "line",
+    data: {
+      labels: lapLabels,
+      datasets: [
+        {
+          label: "จริง",
+          data: actualLaps,
+          borderColor: colorActual,
+          backgroundColor: "rgba(59, 130, 246, 0.2)",
+          tension: 0.3,
+          pointRadius: 2,
+        },
+        {
+          label: "ทำนาย",
+          data: predLaps,
+          borderColor: colorPred,
+          backgroundColor: "rgba(251, 146, 60, 0.2)",
+          tension: 0.3,
+          pointRadius: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          labels: { color: "#e5e7eb" },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) =>
+              `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)} s`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Lap Number",
+            color: "#e5e7eb",
+          },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(55, 65, 81, 0.4)" },
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Lap Time (วินาที)",
+            color: "#e5e7eb",
+          },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(55, 65, 81, 0.4)" },
+        },
+      },
+    },
+  });
+
+  // Bar chart: Strategy comparison
+  const strategyLabels = strategies.map(
+    (s) => `${s.first_compound}→${s.second_compound} @${s.pit_lap}`
+  );
+  const strategyTimes = strategies.map((s) => s.total_time);
+  const bestTime = bestStrategy.total_time;
+
+  const ctxStrat = document.getElementById("strategyChart").getContext("2d");
+  new Chart(ctxStrat, {
+    type: "bar",
+    data: {
+      labels: strategyLabels,
+      datasets: [
+        {
+          label: "Total race time (s)",
+          data: strategyTimes,
+          backgroundColor: strategyTimes.map((t) =>
+            t === bestTime
+              ? "rgba(16, 185, 129, 0.85)" // best = เขียวเด่น
+              : "rgba(148, 163, 184, 0.8)" // others = เทา
+          ),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.parsed.y.toFixed(2)} s`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: "#9ca3af",
+            maxRotation: 45,
+            minRotation: 0,
+            autoSkip: false,
+          },
+          grid: { color: "rgba(55, 65, 81, 0.4)" },
+        },
+        y: {
+          min: minY,
+          max: maxY,
+          title: {
+            display: true,
+            text: "Total time (s)",
+            color: "#e5e7eb",
+          },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(55, 65, 81, 0.4)" },
+        },
+      },
+    },
+  });
+</script>
+{% endblock %}

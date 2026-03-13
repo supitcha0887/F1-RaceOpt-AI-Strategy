@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Analysis · F1 AI Strategy{% endblock %}
+
+{% block content %}
+
+<!-- ── Header ── -->
+<header class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+  <div>
+    <p class="text-xs uppercase tracking-[0.2em] text-emerald-400 font-medium">
+      Dynamic Analysis
+    </p>
+    <h1 class="mt-1 text-3xl font-bold tracking-tight">
+      Race &amp; Driver Analysis
+    </h1>
+    <p class="mt-1 text-sm text-slate-400 max-w-lg">
+      เลือก Race และนักแข่งเพื่อโหลดข้อมูลจริงจาก FastF1
+      และวิเคราะห์ Lap Time + กลยุทธ์ยางผ่านโมเดล AI
+    </p>
+  </div>
+  {% if result %}
+  <div class="text-right text-xs text-slate-500">
+    แสดงผล: <span class="text-slate-200 font-semibold">{{ result.driver }}</span>
+    @ <span class="text-slate-200 font-semibold">{{ result.race_label }}</span>
+  </div>
+  {% endif %}
+</header>
+
+<!-- ── Selector Form ── -->
+<section class="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-lg">
+  <form method="post" class="flex flex-col sm:flex-row gap-4 items-end">
+
+    <div class="flex-1">
+      <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">
+        เลือก Race
+      </label>
+      <select
+        name="race_key"
+        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition"
+      >
+        {% for key, info in available_races.items() %}
+        <option value="{{ key }}" {% if key == selected_race_key %}selected{% endif %}>
+          {{ info.label }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="w-40">
+      <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">
+        เลือก Driver
+      </label>
+      <select
+        name="driver"
+        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition"
+      >
+        {% for d in available_drivers %}
+        <option value="{{ d }}" {% if d == selected_driver %}selected{% endif %}>
+          {{ d }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button
+      type="submit"
+      class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl text-sm transition whitespace-nowrap"
+    >
+      วิเคราะห์ →
+    </button>
+  </form>
+</section>
+
+<!-- ── Error ── -->
+{% if error %}
+<div class="bg-red-900/40 border border-red-700 rounded-2xl p-4 text-sm text-red-300">
+  <span class="font-semibold">เกิดข้อผิดพลาด:</span> {{ error }}
+  <p class="mt-1 text-xs text-red-400">
+    อาจเป็นเพราะนักแข่งคนนี้ไม่มีข้อมูลในการแข่งขันนี้
+    หรือยังไม่ได้เชื่อมต่ออินเทอร์เน็ตเพื่อดึงข้อมูล FastF1
+  </p>
+</div>
+{% endif %}
+
+<!-- ── Results ── -->
+{% if result %}
+
+<!-- Metric Cards -->
+<section class="grid gap-4 grid-cols-2 md:grid-cols-4">
+
+  <div class="bg-slate-900/80 rounded-2xl p-4 border border-slate-800 shadow">
+    <p class="text-xs text-slate-400">MAE (Race นี้)</p>
+    <p class="text-3xl font-semibold mt-1 text-sky-300">{{ result.mae }}</p>
+    <p class="text-xs text-slate-500 mt-1">วินาที / lap</p>
+  </div>
+
+  <div class="bg-slate-900/80 rounded-2xl p-4 border border-slate-800 shadow">
+    <p class="text-xs text-slate-400">RMSE (Race นี้)</p>
+    <p class="text-3xl font-semibold mt-1 text-sky-300">{{ result.rmse }}</p>
+    <p class="text-xs text-slate-500 mt-1">วินาที / lap</p>
+  </div>
+
+  <div class="bg-slate-900/80 rounded-2xl p-4 border border-slate-800 shadow">
+    <p class="text-xs text-slate-400">จำนวน Lap</p>
+    <p class="text-3xl font-semibold mt-1">{{ result.total_laps }}</p>
+    <p class="text-xs text-slate-500 mt-1">laps ของนักแข่งคนนี้</p>
+  </div>
+
+  <div class="bg-slate-900/80 rounded-2xl p-4 border border-emerald-500/40 shadow">
+    <p class="text-xs text-slate-400">เวลาจริงรวม</p>
+    <p class="text-xl font-semibold mt-1">{{ result.real_time }}</p>
+    <p class="text-xs text-slate-500 mt-1">
+      {{ "%.1f"|format(result.real_time_sec) }} s
+    </p>
+  </div>
+</section>
+
+<!-- Lap Chart + Best Strategy -->
+<section class="grid gap-6 lg:grid-cols-5">
+
+  <!-- Chart -->
+  <div class="lg:col-span-3 bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow">
+    <h2 class="text-lg font-semibold mb-0.5">Lap Time จริง vs ทำนาย</h2>
+    <p class="text-xs text-slate-400 mb-3">
+      {{ selected_driver }} · {{ result.race_label }}
+    </p>
+    <canvas id="lapChart" class="w-full h-64"></canvas>
+  </div>
+
+  <!-- Best Strategy Card -->
+  <div class="lg:col-span-2 space-y-4">
+    {% if best_strategy %}
+    <div class="bg-slate-900 rounded-2xl p-4 border border-emerald-500/60 shadow">
+      <p class="text-xs uppercase tracking-wide text-emerald-300 font-semibold">
+        Best Strategy (Simulation)
+      </p>
+      <p class="mt-2 text-sm">
+        <span class="font-semibold text-emerald-300">
+          {{ best_strategy.first_compound }} → {{ best_strategy.second_compound }}
+        </span>
+        &nbsp; Pit Lap
+        <span class="font-semibold">{{ best_strategy.pit_lap }}</span>
+      </p>
+      <div class="mt-3 text-sm space-y-1">
+        <p>
+          <span class="text-slate-400">เวลาจริง:</span>
+          <span class="font-semibold">{{ result.real_time }}</span>
+        </p>
+        <p>
+          <span class="text-slate-400">เวลาจำลอง:</span>
+          <span class="font-semibold">
+            {{ result.best_time }}
+            ({{ "%.1f"|format(best_strategy.total_time) }} s)
+          </span>
+        </p>
+        <p>
+          <span class="text-slate-400">ส่วนต่าง:</span>
+          <span class="font-semibold text-amber-300">{{ result.delta_str }}</span>
+          <span class="text-slate-500 text-xs">
+            (~{{ result.percent_diff|round(2) }}%)
+          </span>
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Strategy Table -->
+    <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow overflow-auto max-h-64">
+      <h3 class="text-sm font-semibold mb-2">กลยุทธ์ที่จำลองทั้งหมด</h3>
+      <table class="w-full text-xs border-collapse">
+        <thead class="text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="py-1 text-left">Strategy</th>
+            <th class="py-1 text-center">Pit</th>
+            <th class="py-1 text-right">Time (s)</th>
+            <th class="py-1 text-right">Δ Best</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in strategies %}
+          <tr class="border-b border-slate-800 {% if s.total_time == best_strategy.total_time %}bg-emerald-500/10{% endif %}">
+            <td class="py-1 pr-2">{{ s.first_compound }}→{{ s.second_compound }}</td>
+            <td class="py-1 text-center">{{ s.pit_lap }}</td>
+            <td class="py-1 text-right">
+              {{ "%.1f"|format(s.total_time) }}
+              {% if s.total_time == best_strategy.total_time %}
+              <span class="text-emerald-300 font-bold">★</span>
+              {% endif %}
+            </td>
+            <td class="py-1 text-right text-slate-300">
+              {% if s.delta_vs_best == 0 %}—
+              {% else %}+{{ "%.1f"|format(s.delta_vs_best) }}{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Strategy Bar Chart -->
+<section class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow">
+  <h2 class="text-lg font-semibold mb-0.5">เปรียบเทียบเวลารวมแต่ละกลยุทธ์</h2>
+  <p class="text-xs text-slate-400 mb-3">แท่งเตี้ย = เวลาน้อย = ดีกว่า</p>
+  <canvas id="stratChart" class="w-full h-56"></canvas>
+</section>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const lapLabels    = JSON.parse('{{ lap_labels    | tojson | safe }}');
+    const actualLaps   = JSON.parse('{{ actual_laps   | tojson | safe }}');
+    const predLaps     = JSON.parse('{{ pred_laps     | tojson | safe }}');
+    const strategies   = JSON.parse('{{ strategies    | tojson | safe }}');
+    const bestStrategy = JSON.parse('{{ best_strategy | tojson | safe }}');
+    const minY         = JSON.parse('{{ min_y | tojson | safe }}');
+    const maxY         = JSON.parse('{{ max_y | tojson | safe }}');
+
+  // Lap Time chart
+  new Chart(document.getElementById("lapChart").getContext("2d"), {
+    type: "line",
+    data: {
+      labels: lapLabels,
+      datasets: [
+        {
+          label: "จริง",
+          data: actualLaps,
+          borderColor: "rgba(59,130,246,1)",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          tension: 0.3, pointRadius: 2,
+        },
+        {
+          label: "ทำนาย",
+          data: predLaps,
+          borderColor: "rgba(251,146,60,1)",
+          backgroundColor: "rgba(251,146,60,0.15)",
+          tension: 0.3, pointRadius: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: "#e5e7eb" } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)} s` } },
+      },
+      scales: {
+        x: { title: { display: true, text: "Lap", color: "#e5e7eb" }, ticks: { color: "#9ca3af" }, grid: { color: "rgba(55,65,81,0.4)" } },
+        y: { title: { display: true, text: "Lap Time (s)", color: "#e5e7eb" }, ticks: { color: "#9ca3af" }, grid: { color: "rgba(55,65,81,0.4)" } },
+      },
+    },
+  });
+
+  // Strategy bar chart
+  const stratLabels = strategies.map(s => `${s.first_compound}→${s.second_compound} @${s.pit_lap}`);
+  const stratTimes  = strategies.map(s => s.total_time);
+  const bestTime    = bestStrategy.total_time;
+
+  new Chart(document.getElementById("stratChart").getContext("2d"), {
+    type: "bar",
+    data: {
+      labels: stratLabels,
+      datasets: [{
+        data: stratTimes,
+        backgroundColor: stratTimes.map(t =>
+          t === bestTime ? "rgba(16,185,129,0.85)" : "rgba(148,163,184,0.7)"
+        ),
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toFixed(1)} s` } } },
+      scales: {
+        x: { ticks: { color: "#9ca3af", maxRotation: 40, autoSkip: false }, grid: { color: "rgba(55,65,81,0.4)" } },
+        y: { min: minY, max: maxY, title: { display: true, text: "Total time (s)", color: "#e5e7eb" }, ticks: { color: "#9ca3af" }, grid: { color: "rgba(55,65,81,0.4)" } },
+      },
+    },
+  });
+</script>
+
+{% else %}
+<!-- Placeholder เมื่อยังไม่เลือก -->
+<div class="flex flex-col items-center justify-center py-20 text-slate-500 gap-3">
+  <svg class="w-12 h-12 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+  </svg>
+  <p class="text-sm">เลือก Race และ Driver แล้วกด "วิเคราะห์ →" เพื่อดูผล</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}F1 AI Strategy{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", sans-serif;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-950 text-slate-50 min-h-screen">
+
+    <div class="h-1 w-full bg-gradient-to-r from-emerald-400 via-sky-400 to-fuchsia-500"></div>
+
+    <nav class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-30">
+      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse mr-1"></div>
+          <span class="font-semibold tracking-tight">F1 AI Strategy</span>
+          <span class="ml-2 text-xs text-slate-500 hidden sm:inline">
+            Bahrain GP 2023 · Random Forest
+          </span>
+        </div>
+        <div class="flex items-center gap-1 text-sm">
+          <a href="{{ url_for('index') }}"
+             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
+            Overview
+          </a>
+          <a href="{{ url_for('analysis_page') }}"
+             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition font-medium text-emerald-400">
+            📊 Analysis
+          </a>
+          <a href="{{ url_for('race_page') }}"
+             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
+            Full Race
+          </a>
+          <a href="{{ url_for('realtime_page') }}"
+             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
+            Real-Time
+          </a>
+          <a href="{{ url_for('game_page') }}"
+             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
+            Game
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

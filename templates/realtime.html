@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Real-Time Predictor · F1 AI{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold tracking-tight mb-2">
+  Real-Time Race Predictor
+</h1>
+<p class="text-sm text-slate-400 mb-4">
+  เลือก Lap ปัจจุบันเพื่อดูอันดับชั่วคราว, gap, average pace 5 lap ล่าสุด และความน่าจะเป็นที่ AI
+  คาดว่ารถคันไหนจะชนะจากการจำลองทั้งสนาม
+</p>
+
+<div class="bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800 space-y-4">
+  <div class="flex items-center justify-between gap-4">
+    <div>
+      <p class="text-xs text-slate-400 mb-1">Current Lap</p>
+      <input
+        id="lapSlider"
+        type="range"
+        min="1"
+        max="{{ total_laps }}"
+        value="{{ total_laps }}"
+        class="w-56"
+      />
+    </div>
+    <p class="text-xs text-slate-400">
+      Lap:
+      <span id="lapLabel" class="font-semibold text-slate-100"
+        >{{ total_laps }}</span
+      >
+      / {{ total_laps }}
+    </p>
+  </div>
+
+  <div class="overflow-auto max-h-[420px]">
+    <table class="w-full text-xs border-collapse" id="rtTable">
+      <thead class="text-slate-400 border-b border-slate-700">
+        <tr>
+          <th class="py-1 text-left">Pos</th>
+          <th class="py-1 text-left">Driver</th>
+          <th class="py-1 text-right">Cum. Time (s)</th>
+          <th class="py-1 text-right">Gap (s)</th>
+          <th class="py-1 text-right">Avg last 5 laps (s)</th>
+          <th class="py-1 text-right">Win Prob.</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const raceData  = JSON.parse('{{ race_data  | tojson | safe }}');
+  const winProbs  = JSON.parse('{{ win_probs  | tojson | safe }}');
+  const totalLaps = JSON.parse('{{ total_laps | tojson | safe }}');
+
+  function computeState(currentLap) {
+    const state = [];
+
+    raceData.forEach((d) => {
+      const laps = d.laps.slice(0, currentLap);
+      const cum = laps.reduce((a, b) => a + b, 0);
+      const last5 = laps.slice(-5);
+      const avg5 =
+        last5.length > 0
+          ? last5.reduce((a, b) => a + b, 0) / last5.length
+          : null;
+
+      state.push({
+        code: d.code,
+        cum,
+        avg5,
+        prob: winProbs[d.code] || 0,
+      });
+    });
+
+    state.sort((a, b) => a.cum - b.cum);
+    const leaderTime = state[0].cum;
+    state.forEach((s, i) => {
+      s.rank = i + 1;
+      s.gap = s.cum - leaderTime;
+    });
+    return state;
+  }
+
+  function renderTable(currentLap) {
+    const tbody = document.querySelector("#rtTable tbody");
+    tbody.innerHTML = "";
+    const state = computeState(currentLap);
+
+    state.forEach((s) => {
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-slate-800";
+      tr.innerHTML = `
+        <td class="py-1 pr-2">${s.rank}</td>
+        <td class="py-1 pr-2 font-semibold">${s.code}</td>
+        <td class="py-1 text-right">${s.cum.toFixed(2)}</td>
+        <td class="py-1 text-right">${s.rank === 1 ? "-" : "+" + s.gap.toFixed(2)}</td>
+        <td class="py-1 text-right">${
+          s.avg5 ? s.avg5.toFixed(3) : "-"
+        }</td>
+        <td class="py-1 text-right">${(s.prob * 100).toFixed(1)}%</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  const slider = document.getElementById("lapSlider");
+  const lapLabel = document.getElementById("lapLabel");
+  slider.addEventListener("input", () => {
+    const lap = parseInt(slider.value, 10);
+    lapLabel.textContent = lap;
+    renderTable(lap);
+  });
+
+  // initial render
+  renderTable(totalLaps);
+</script>
+{% endblock %}
