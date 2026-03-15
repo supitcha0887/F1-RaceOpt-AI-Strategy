@@ -21,29 +21,24 @@
           <div class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse mr-1"></div>
           <span class="font-semibold tracking-tight">F1 AI Strategy</span>
           <span class="ml-2 text-xs text-slate-500 hidden sm:inline">
-            Bahrain GP 2023 · Random Forest
+            Random Forest · FastF1
           </span>
         </div>
         <div class="flex items-center gap-1 text-sm">
           <a href="{{ url_for('index') }}"
-             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
-            Overview
+             class="px-3 py-1.5 rounded-lg transition
+             {% if request.endpoint == 'index' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
+            📊 Overview
           </a>
           <a href="{{ url_for('analysis_page') }}"
-             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition font-medium text-emerald-400">
-            📊 Analysis
+             class="px-3 py-1.5 rounded-lg transition
+             {% if request.endpoint == 'analysis_page' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
+            🔬 Analysis
           </a>
-          <a href="{{ url_for('race_page') }}"
-             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
-            Full Race
-          </a>
-          <a href="{{ url_for('realtime_page') }}"
-             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
-            Real-Time
-          </a>
-          <a href="{{ url_for('game_page') }}"
-             class="px-3 py-1 rounded-lg hover:bg-slate-800 hover:text-emerald-300 transition">
-            Game
+          <a href="{{ url_for('play_strategy_page') }}"
+             class="px-3 py-1.5 rounded-lg transition
+             {% if request.endpoint == 'play_strategy_page' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
+            🏎️ Play Strategy
           </a>
         </div>
       </div>
@@ -52,5 +47,7 @@
     <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
       {% block content %}{% endblock %}
     </main>
+
+    {% block scripts %}{% endblock %}
   </body>
 </html>

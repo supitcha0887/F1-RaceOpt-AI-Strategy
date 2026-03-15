@@ -1,6 +1,7 @@
 # train_model_advanced.py
 """
-เทรนโมเดล Random Forest ขั้นสูงสำหรับทำนาย Lap Time ของ F1
+เทรนโมเดล Random Forest จากข้อมูลหลาย Race / หลายนักแข่ง
+บันทึก model.pkl เดียวที่ใช้ได้กับทุก race
 """
 
 import pickle
@@ -9,58 +10,76 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-from data_pipeline import load_race_laps
+from data_pipeline import load_multi_race_laps, AVAILABLE_RACES, AVAILABLE_DRIVERS
+
+
+# ============================================================
+# ตั้งค่า: เลือก race + driver ที่จะใช้เทรน
+# เพิ่ม/ลดได้เลย (ยิ่งมาก = โมเดลแม่นยำขึ้น แต่ใช้เวลาโหลดนานขึ้น)
+# ============================================================
+TRAIN_COMBINATIONS = [
+    # (year, gp, driver)
+    (2023, "Bahrain", "VER"),
+    (2023, "Bahrain", "HAM"),
+    (2023, "Bahrain", "LEC"),
+    (2023, "Bahrain", "ALO"),
+    (2023, "Saudi Arabia", "VER"),
+    (2023, "Saudi Arabia", "PER"),
+    (2023, "Australia", "VER"),
+    (2023, "Australia", "HAM"),
+    (2022, "Bahrain", "LEC"),
+    (2022, "Bahrain", "VER"),
+]
 
 
 def train_advanced_model():
-    print("=== โหลดข้อมูลจาก FastF1 ===")
-    data, meta = load_race_laps(2023, "Bahrain", "VER")
+    print("=== โหลดข้อมูลจาก FastF1 (หลาย race) ===")
+    combined_data, all_meta = load_multi_race_laps(TRAIN_COMBINATIONS)
+
+    print(f"\nรวมข้อมูลทั้งหมด: {len(combined_data)} laps จาก {len(all_meta)} combinations")
 
     # แยก X, y
-    y = data["LapTimeSec"].values
-    X = data.drop(columns=["LapTimeSec"])
+    y = combined_data["LapTimeSec"].values
+    X = combined_data.drop(columns=["LapTimeSec"])
 
+    # ลบ column ที่ไม่ใช่ตัวเลข (เผื่อมีหลงเหลือ)
+    X = X.select_dtypes(include=[np.number])
     feature_cols = X.columns.tolist()
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    print(f"จำนวนตัวอย่าง (ทั้งหมด): {len(X)}")
-    print(f"Train: {len(X_train)}, Test: {len(X_test)}")
-    print(f"จำนวนฟีเจอร์: {len(feature_cols)}")
+    print(f"Train: {len(X_train)}, Test: {len(X_test)}, Features: {len(feature_cols)}")
 
-    print("\n=== เทรนโมเดล RandomForest ขั้นสูง ===")
+    print("\n=== เทรนโมเดล RandomForest ===")
     model = RandomForestRegressor(
-        n_estimators=800,
-        max_depth=18,
-        min_samples_split=2,
+        n_estimators=500,
+        max_depth=16,
+        min_samples_split=3,
         min_samples_leaf=2,
         random_state=42,
         n_jobs=-1,
     )
-
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
-    mae = mean_absolute_error(y_test, y_pred)
+    mae  = mean_absolute_error(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
     print(f"MAE  = {mae:.3f} วินาที")
     print(f"RMSE = {rmse:.3f} วินาที")
 
-    print("\n=== บันทึกโมเดลลงไฟล์ model.pkl ===")
+    print("\n=== บันทึกโมเดล → model.pkl ===")
     with open("model.pkl", "wb") as f:
-        pickle.dump(
-            {
-                "model": model,
-                "features": feature_cols,
-                "meta": meta,
-                "mae": mae,
-                "rmse": rmse,
-            },
-            f,
-        )
+        pickle.dump({
+            "model":    model,
+            "features": feature_cols,
+            "meta":     all_meta,
+            "mae":      mae,
+            "rmse":     rmse,
+            "trained_on": TRAIN_COMBINATIONS,
+        }, f)
 
     print("เสร็จสิ้น 🎉")
 

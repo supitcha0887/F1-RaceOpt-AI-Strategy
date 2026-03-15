@@ -1,146 +1,212 @@
-<!-- templates/play_strategy.html -->
 {% extends "base.html" %}
-
-{% block title %}Play F1 Strategy{% endblock %}
+{% block title %}Play Strategy · F1 AI{% endblock %}
 
 {% block content %}
-<section class="space-y-4">
-  <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-    <div>
-      <h1 class="text-2xl md:text-3xl font-bold tracking-tight">
-        Play Strategy – ลองเป็น Race Engineer
-      </h1>
-      <p class="mt-1 text-sm text-slate-300 max-w-xl">
-        เลือกชุดยางเริ่มต้น, ชุดยางหลังพิท และ lap ที่จะเข้าพิท ระบบจะใช้ AI
-        จำลองเวลารวมของการแข่งขันให้ แล้วเปรียบเทียบกับผลจริง
-      </p>
-    </div>
-  </header>
+{%- macro hms(s) -%}
+  {%- set s = s | int -%}
+  {{- "%d:%02d:%02d" | format(s // 3600, (s % 3600) // 60, s % 60) -}}
+{%- endmacro -%}
 
-  <div class="grid gap-6 md:grid-cols-5">
-    <!-- Form -->
-    <div class="md:col-span-2 bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800">
-      <h2 class="text-lg font-semibold mb-2">ตั้งค่ากลยุทธ์ของคุณ</h2>
+<header class="flex flex-col gap-1">
+  <p class="text-xs uppercase tracking-[0.2em] text-fuchsia-400 font-medium">Race Engineer Mode</p>
+  <h1 class="text-3xl font-bold tracking-tight">Play Strategy</h1>
+  <p class="text-sm text-slate-400 max-w-lg">
+    เลือกกลยุทธ์ยางและรอบพิทของคุณเอง — AI จะจำลองผลและบอกว่าคุณจะได้อันดับที่เท่าไหร่
+  </p>
+</header>
 
-      <form method="post" class="space-y-3 text-sm">
-        <div>
-          <label class="block text-slate-300 mb-1">ยางเริ่มต้น (Start Compound)</label>
-          <select
-            name="start_compound"
-            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-sm"
-          >
-            <option value="SOFT">Soft (C3 / แดง)</option>
-            <option value="MEDIUM" selected>Medium (C2 / เหลือง)</option>
-            <option value="HARD">Hard (C1 / ขาว)</option>
-          </select>
-        </div>
+<div class="grid gap-6 md:grid-cols-5">
 
-        <div>
-          <label class="block text-slate-300 mb-1">ยางหลังเข้าพิท (Second Compound)</label>
-          <select
-            name="second_compound"
-            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-sm"
-          >
-            <option value="SOFT" selected>Soft (C3 / แดง)</option>
-            <option value="MEDIUM">Medium (C2 / เหลือง)</option>
-            <option value="HARD">Hard (C1 / ขาว)</option>
-          </select>
-        </div>
+  <!-- ── Form ─────────────────────────────── -->
+  <div class="md:col-span-2 bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow space-y-4">
+    <h2 class="text-sm font-semibold text-slate-200">ตั้งค่ากลยุทธ์ของคุณ</h2>
 
-        <div>
-          <label class="block text-slate-300 mb-1"
-            >Lap ที่จะเข้าพิท (1 – {{ total_laps }})</label
-          >
-          <input
-            type="number"
-            name="pit_lap"
-            min="2"
-            max="{{ total_laps - 2 }}"
-            value="20"
-            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-sm"
-          />
-        </div>
+    <form method="post" class="space-y-4 text-sm">
 
-        <button
-          type="submit"
-          class="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition"
-        >
-          จำลองกลยุทธ์นี้
-        </button>
-      </form>
-
-      <p class="mt-3 text-[11px] text-slate-400 leading-relaxed">
-        ตอนนี้ engine รองรับแบบ 1-stop (2 stints) เป็นหลัก เพื่อง่ายต่อการอธิบาย
-        แต่โครงสร้างรองรับการขยายไปเป็น multi-stop ได้ในอนาคต
-      </p>
-    </div>
-
-    <!-- Result -->
-    <div class="md:col-span-3 bg-slate-900 rounded-2xl p-4 shadow-lg border border-slate-800">
-      <h2 class="text-lg font-semibold mb-2">ผลการจำลองกลยุทธ์ของคุณ</h2>
-
-      {% if result %}
-      <div class="space-y-3 text-sm">
-        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
-          <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">
-            Your Strategy
-          </p>
-          <p class="text-sm">
-            Start:
-            <span class="font-semibold text-emerald-300">{{ result.start }}</span>
-            →
-            <span class="font-semibold text-emerald-300">{{ result.second }}</span>
-            &nbsp; (Pit lap:
-            <span class="font-semibold">{{ result.pit_lap }}</span>)
-          </p>
-        </div>
-
-        <div class="grid sm:grid-cols-3 gap-3">
-          <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
-            <p class="text-xs text-slate-400">เวลารวมจาก AI (กลยุทธ์นี้)</p>
-            <p class="text-xl font-semibold mt-1">
-              {{ result.user_time_str }}
-            </p>
-            <p class="text-[11px] text-slate-400">
-              ({{ "%.2f"|format(result.user_time) }} s)
-            </p>
-          </div>
-
-          <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
-            <p class="text-xs text-slate-400">เวลาจริงจากการแข่งขัน</p>
-            <p class="text-xl font-semibold mt-1">
-              {{ result.real_time_str }}
-            </p>
-            <p class="text-[11px] text-slate-400">
-              ({{ "%.2f"|format(result.real_time) }} s)
-            </p>
-          </div>
-
-          <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
-            <p class="text-xs text-slate-400">ส่วนต่าง (กลยุทธ์คุณ vs จริง)</p>
-            <p
-              class="text-xl font-semibold mt-1 {% if result.delta_real < 0 %}text-emerald-300{% else %}text-amber-300{% endif %}"
-            >
-              {{ result.delta_real_str }}
-            </p>
-            <p class="text-[11px] text-slate-400">
-              ค่าเป็น + = ช้ากว่าของจริง, ค่าเป็น - = เร็วกว่า
-            </p>
-          </div>
-        </div>
-
-        <p class="text-[11px] text-slate-400 leading-relaxed">
-          ตีความหมายเช่น ถ้าผลออกมาเป็น <span class="text-emerald-300">-2.50 s</span>
-          แปลว่า ถ้าใช้กลยุทธ์นี้จริง นักแข่งอาจเข้าเส้นชัยเร็วกว่าผลจริงประมาณ
-          2.5 วินาที (ภายใต้สมมติฐานว่า driver ขับด้วย pace เดิม, ไม่มีเหตุการณ์พิเศษอื่น ๆ)
-        </p>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">สนามแข่ง</label>
+        <select name="race_key"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500 transition">
+          {% for key, info in available_races.items() %}
+          <option value="{{ key }}" {% if key == selected_race_key %}selected{% endif %}>
+            {{ info.label }} ({{ info.laps }} laps)
+          </option>
+          {% endfor %}
+        </select>
       </div>
-      {% else %}
-      <p class="text-sm text-slate-400">
-        ตั้งค่ากลยุทธ์ด้านซ้าย แล้วกด “จำลองกลยุทธ์นี้” เพื่อดูผลลัพธ์เปรียบเทียบกับเวลาจริงของการแข่งขัน
-      </p>
-      {% endif %}
-    </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">ยางเริ่มต้น</label>
+        <select name="start_compound"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500 transition">
+          <option value="SOFT"   {% if form_data and form_data.start == 'SOFT'   %}selected{% endif %}>🔴 Soft (C3)</option>
+          <option value="MEDIUM" {% if not form_data or form_data.start == 'MEDIUM' %}selected{% endif %}>🟡 Medium (C2)</option>
+          <option value="HARD"   {% if form_data and form_data.start == 'HARD'   %}selected{% endif %}>⚪ Hard (C1)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">ยางหลังพิท</label>
+        <select name="second_compound"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500 transition">
+          <option value="SOFT"   {% if form_data and form_data.second == 'SOFT' %}selected{% endif %}>🔴 Soft (C3)</option>
+          <option value="MEDIUM" {% if form_data and form_data.second == 'MEDIUM' %}selected{% endif %}>🟡 Medium (C2)</option>
+          <option value="HARD"   {% if form_data and form_data.second == 'HARD'   %}selected{% endif %}>⚪ Hard (C1)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 uppercase tracking-wide">
+          รอบที่พิท (Lap 2 – {{ total_laps - 2 }}) · สนามนี้แข่ง {{ total_laps }} รอบ
+        </label>
+        <input type="number" name="pit_lap"
+          min="2" max="{{ total_laps - 2 }}"
+          value="{{ form_data.pit_lap if form_data else 20 }}"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-fuchsia-500 transition" />
+      </div>
+
+      <button type="submit"
+        class="w-full py-2.5 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-bold rounded-xl text-sm transition">
+        จำลองกลยุทธ์นี้ →
+      </button>
+    </form>
+
+    <p class="text-[11px] text-slate-500 leading-relaxed pt-1 border-t border-slate-800">
+      AI จะจำลองกลยุทธ์ของคุณเทียบกับ 20 นักแข่ง ด้วย pace model ของแต่ละคน
+    </p>
   </div>
-</section>
+
+  <!-- ── Result ─────────────────────────────── -->
+  <div class="md:col-span-3 space-y-4">
+
+    {% if result %}
+
+    <!-- อันดับ highlight -->
+    <div class="bg-slate-900 rounded-2xl p-5 border
+      {% if result.rank <= 3 %}border-emerald-500/60{% elif result.rank <= 10 %}border-sky-500/40{% else %}border-slate-700{% endif %}
+      shadow">
+      <div class="flex items-center gap-4">
+        <div class="text-5xl font-black
+          {% if result.rank == 1 %}text-amber-300
+          {% elif result.rank <= 3 %}text-emerald-300
+          {% elif result.rank <= 10 %}text-sky-300
+          {% else %}text-slate-400{% endif %}">
+          P{{ result.rank }}
+        </div>
+        <div>
+          <p class="text-[11px] text-slate-500 mb-0.5">{{ race_label }}</p>
+          <p class="text-sm font-semibold text-slate-200">
+            กลยุทธ์ของคุณ:
+            <span class="text-fuchsia-300">{{ result.start }} → {{ result.second }}</span>
+            (Pit Lap {{ result.pit_lap }})
+          </p>
+          <p class="text-xs text-slate-400 mt-0.5">
+            เวลาจำลอง:
+            <span class="text-slate-200 font-semibold">{{ result.user_time_str }}</span>
+            <span class="text-slate-500 text-[10px]">({{ "%.1f"|format(result.user_time) }} s)</span>
+            &nbsp;·&nbsp;
+            เวลาจริง:
+            <span class="text-slate-200">{{ result.real_time_str }}</span>
+            <span class="text-slate-500 text-[10px]">({{ "%.1f"|format(result.real_time) }} s)</span>
+          </p>
+          <p class="text-xs mt-1">
+            ส่วนต่างจากเวลาจริง:
+            <span class="font-bold {% if result.delta_real < 0 %}text-emerald-400{% else %}text-amber-400{% endif %}">
+              {{ result.delta_real_str }}
+            </span>
+            <span class="text-slate-500">
+              ({% if result.delta_real < 0 %}เร็วกว่าจริง{% else %}ช้ากว่าจริง{% endif %})
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gap to P1 -->
+    <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow">
+      <p class="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-3">ห่างจากอันดับ 1</p>
+      <div class="flex items-center gap-4">
+        <div class="text-3xl font-bold font-mono
+          {% if result.gap_to_p1 == 0 %}text-emerald-300
+          {% elif result.gap_to_p1 < 30 %}text-amber-300
+          {% else %}text-red-400{% endif %}">
+          {% if result.gap_to_p1 == 0 %}P1!{% else %}+{{ "%.2f"|format(result.gap_to_p1) }} s{% endif %}
+        </div>
+        <div class="flex-1 bg-slate-800 rounded-full h-2">
+            <div class="h-2 rounded-full bg-fuchsia-500 transition-all" style="width: {{ result.gap_bar }}%"></div>
+        </div>
+        <p class="text-xs text-slate-400">เวลาต่างจากรถที่ชนะการจำลอง</p>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 shadow overflow-hidden">
+      <div class="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold">ผลการจำลองทั้ง 20 คัน</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">{{ race_label }}</p>
+        </div>
+        <span class="text-xs text-slate-400">คุณ = แถวสีม่วง</span>
+      </div>
+      <table class="w-full text-xs border-collapse">
+        <thead class="text-slate-400 border-b border-slate-700 bg-slate-950/50">
+          <tr>
+            <th class="py-2 px-4 text-left">Pos</th>
+            <th class="py-2 px-2 text-left">Driver / Strategy</th>
+            <th class="py-2 px-2 text-center">Pit</th>
+            <th class="py-2 px-2 text-right">เวลา (s)</th>
+            <th class="py-2 px-4 text-right">Gap to P1</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in leaderboard %}
+          <tr class="border-b border-slate-800
+            {% if r.is_user %}bg-fuchsia-500/15{% endif %}">
+            <td class="py-1.5 px-4 font-bold
+              {% if r.rank == 1 %}text-amber-300
+              {% elif r.rank <= 3 %}text-emerald-300
+              {% elif r.is_user %}text-fuchsia-300
+              {% endif %}">
+              {{ r.rank }}
+            </td>
+            <td class="py-1.5 px-2">
+              {% if r.is_user %}
+              <span class="text-fuchsia-300 font-bold">★ YOU</span>
+              <span class="text-slate-400 ml-1">{{ r.start }} → {{ r.second }}</span>
+              {% else %}
+              <span class="font-semibold">{{ r.code }}</span>
+              <span class="text-slate-400 ml-1">{{ r.start }} → {{ r.second }}</span>
+              {% endif %}
+            </td>
+            <td class="py-1.5 px-2 text-center text-slate-300">{{ r.pit_lap }}</td>
+            <td class="py-1.5 px-2 text-right font-mono">
+              {{ hms(r.total_time) }}
+              <span class="text-slate-500 text-[10px] block">{{ "%.1f"|format(r.total_time) }} s</span>
+            </td>
+            <td class="py-1.5 px-4 text-right font-mono
+              {% if r.rank == 1 %}text-emerald-300 font-bold
+              {% elif r.is_user %}text-fuchsia-300 font-bold
+              {% else %}text-slate-300{% endif %}">
+              {% if r.rank == 1 %}—{% else %}+{{ "%.2f"|format(r.gap_to_p1) }} s{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <!-- Placeholder -->
+    <div class="flex flex-col items-center justify-center py-24 text-slate-600 gap-3">
+      <svg class="w-14 h-14 opacity-25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+      </svg>
+      <p class="text-sm">เลือกกลยุทธ์ด้านซ้ายแล้วกด "จำลองกลยุทธ์นี้ →"</p>
+      <p class="text-xs text-slate-700">AI จะจำลองคุณเทียบกับ 20 นักแข่ง แล้วบอกอันดับและ win probability</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
 {% endblock %}
