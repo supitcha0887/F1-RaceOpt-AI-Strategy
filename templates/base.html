@@ -28,17 +28,17 @@
           <a href="{{ url_for('index') }}"
              class="px-3 py-1.5 rounded-lg transition
              {% if request.endpoint == 'index' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
-            📊 Overview
+            🧪 Model Performance
           </a>
           <a href="{{ url_for('analysis_page') }}"
              class="px-3 py-1.5 rounded-lg transition
              {% if request.endpoint == 'analysis_page' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
-            🔬 Analysis
+            🔍 Strategy Analysis
           </a>
           <a href="{{ url_for('play_strategy_page') }}"
              class="px-3 py-1.5 rounded-lg transition
              {% if request.endpoint == 'play_strategy_page' %}bg-slate-800 text-emerald-300 font-semibold{% else %}hover:bg-slate-800 hover:text-slate-200 text-slate-400{% endif %}">
-            🏎️ Play Strategy
+            ⚙️ Custom Strategy
           </a>
         </div>
       </div>
